@@ -62,3 +62,6 @@ CREATE TABLE `StockMovement` (
   PRIMARY KEY (`id`),
   CONSTRAINT `StockMovement_productSkuId_fkey` FOREIGN KEY (`productSkuId`) REFERENCES `ProductSku`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE `StockMovement`
+  ADD COLUMN `reference` VARCHAR(191) NULL,
+  ADD COLUMN `actorUserId` VARCHAR(191) NULL;
