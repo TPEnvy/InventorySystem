@@ -1,0 +1,20 @@
+name: Build and validate
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install
+      - run: npx prisma validate --schema apps/api/prisma/schema.prisma
+        env:
+          DATABASE_URL: mysql://test:test@127.0.0.1:3306/papa_cologne
+      - run: npm run build
