@@ -1,0 +1,12 @@
+{
+  "name": "papa-cologne-inventory",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace papa-cologne-api && npm run build --workspace papa-cologne-web"
+  }
+}
