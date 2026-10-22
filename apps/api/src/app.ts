@@ -5,7 +5,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { PrismaClient, ProductKind, MovementType, Role } from "@prisma/client";
+import { PrismaClient, ProductKind, MovementType, Role, Prisma } from "@prisma/client";
 import { z } from "zod";
 import ExcelJS from "exceljs";
 const db = new PrismaClient();
