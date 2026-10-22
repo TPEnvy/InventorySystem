@@ -1,0 +1,31 @@
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import ExcelJS from "exceljs";
+import { PrismaClient, ProductKind, MovementType } from "@prisma/client";
+import { z } from "zod";
+const app=express(), prisma=new PrismaClient(), port=Number(process.env.PORT||4000);
+app.use(helmet()); app.use(cors({origin:process.env.CORS_ORIGIN?.split(",").map(x=>x.trim())||false})); app.use(express.json({limit:"1mb"})); app.use(rateLimit({windowMs:60000,limit:120}));
+app.get("/health",(_req,res)=>res.json({ok:true}));
+app.get("/api/skus",async(_req,res,next)=>{try{res.json(await prisma.productSku.findMany({where:{active:true},include:{fragrance:true,balance:true},orderBy:{sku:"asc"}}))}catch(e){next(e)}});
+app.post("/api/skus",async(req,res,next)=>{try{
+const b=z.object({brand:z.string().min(1),name:z.string().min(1),concentration:z.string().optional(),sku:z.string().min(1),kind:z.nativeEnum(ProductKind),bottleVolumeMl:z.number().positive().optional(),decantSizeMl:z.number().positive().optional(),costPerUnit:z.number().nonnegative(),sellingPrice:z.number().nonnegative(),openingQuantity:z.number().nonnegative().default(0)}).parse(req.body);
+if(b.kind==="FULL_BOTTLE"&&!b.bottleVolumeMl) return res.status(400).json({error:"Full bottle needs bottleVolumeMl"});
+if(b.kind==="DECANT"&&!b.decantSizeMl) return res.status(400).json({error:"Decant needs decantSizeMl"});
+const result=await prisma.$transaction(async tx=>{const f=await tx.fragrance.upsert({where:{brand_name_concentration:{brand:b.brand,name:b.name,concentration:b.concentration??""}},update:{},create:{brand:b.brand,name:b.name,concentration:b.concentration??""}});const s=await tx.productSku.create({data:{fragranceId:f.id,sku:b.sku,kind:b.kind,bottleVolumeMl:b.bottleVolumeMl,decantSizeMl:b.decantSizeMl,costPerUnit:b.costPerUnit,sellingPrice:b.sellingPrice,balance:{create:{quantity:b.openingQuantity}}},include:{fragrance:true,balance:true}});if(b.openingQuantity)await tx.stockMovement.create({data:{productSkuId:s.id,type:MovementType.ADJUSTMENT,quantityDelta:b.openingQuantity,unit:b.kind==="DECANT"?"decant":"sealed-bottle",reason:"Opening stock"}});return s});
+res.status(201).json(result)}catch(e){next(e)}});
+app.post("/api/decants/produce",async(req,res,next)=>{try{
+const b=z.object({sourceSkuId:z.string(),decantSkuId:z.string(),quantity:z.number().int().positive().max(1000)}).parse(req.body);
+const out=await prisma.$transaction(async tx=>{const [src,dst]=await Promise.all([tx.productSku.findUnique({where:{id:b.sourceSkuId},include:{balance:true}}),tx.productSku.findUnique({where:{id:b.decantSkuId},include:{balance:true}})]);if(!src||!dst)throw Error("SKU not found");if(src.kind!=="FULL_BOTTLE"||dst.kind!=="DECANT"||src.fragranceId!==dst.fragranceId)throw Error("Choose matching full-bottle source and decant SKU");
+const bottle=Number(src.bottleVolumeMl), size=Number(dst.decantSizeMl), sealed=Number(src.balance?.quantity||0), open=Number(src.balance?.remainingVolumeMl||0), used=b.quantity*size, available=sealed*bottle+open;if(!bottle||!size||used>available)throw Error("Invalid volume or insufficient liquid");
+const opened=Math.max(0,Math.ceil((used-open)/bottle)), remain=open+opened*bottle-used, sealedAfter=sealed-opened;if(sealedAfter<0)throw Error("Not enough sealed bottles");
+await tx.inventoryBalance.update({where:{productSkuId:src.id},data:{quantity:sealedAfter,remainingVolumeMl:remain}});
+await tx.inventoryBalance.upsert({where:{productSkuId:dst.id},create:{productSkuId:dst.id,quantity:b.quantity},update:{quantity:{increment:b.quantity}}});
+await tx.stockMovement.createMany({data:[{productSkuId:src.id,type:MovementType.DECANT_PRODUCTION,quantityDelta:-opened,unit:"sealed-bottle-opened",sourceSkuId:dst.id,sourceVolumeMl:used,reason:"Decant production"},{productSkuId:dst.id,type:MovementType.DECANT_PRODUCTION,quantityDelta:b.quantity,unit:"decant",sourceSkuId:src.id,sourceVolumeMl:used,reason:"Decant production"}]});
+return {decantsProduced:b.quantity,consumedMl:used,remainingOpenedMl:remain,sealedBottlesRemaining:sealedAfter}});
+res.status(201).json(out)}catch(e){next(e)}});
+app.get("/api/reports/inventory.xlsx",async(_req,res,next)=>{try{const rows=await prisma.productSku.findMany({include:{fragrance:true,balance:true}});const w=new ExcelJS.Workbook(),s=w.addWorksheet("Inventory");s.columns=[{header:"SKU",key:"sku",width:18},{header:"Brand",key:"brand",width:20},{header:"Fragrance",key:"name",width:26},{header:"Type",key:"kind",width:18},{header:"Bottle ml",key:"bottle",width:12},{header:"Decant ml",key:"decant",width:12},{header:"Stock quantity",key:"qty",width:16},{header:"Opened liquid ml",key:"open",width:18},{header:"Cost",key:"cost",width:12},{header:"Selling price",key:"price",width:16}];rows.forEach(x=>s.addRow({sku:x.sku,brand:x.fragrance.brand,name:x.fragrance.name,kind:x.kind,bottle:x.bottleVolumeMl?.toString()||"",decant:x.decantSizeMl?.toString()||"",qty:x.balance?.quantity.toString()||"0",open:x.balance?.remainingVolumeMl.toString()||"0",cost:x.costPerUnit.toString(),price:x.sellingPrice.toString()}));s.getRow(1).font={bold:true};res.setHeader("Content-Type","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");res.setHeader("Content-Disposition",'attachment; filename="papa-cologne-inventory.xlsx"');await w.xlsx.write(res);res.end()}catch(e){next(e)}});
+app.use((e:unknown,_req:express.Request,res:express.Response,_next:express.NextFunction)=>res.status(400).json({error:e instanceof Error?e.message:"Unexpected error"}));
+app.listen(port,()=>console.log("Papa Cologne API listening on "+port));
