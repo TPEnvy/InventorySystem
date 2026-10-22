@@ -3,62 +3,78 @@ generator client {
 }
 datasource db {
   provider = "mysql"
-  url      = env("DATABASE_URL")
+  url = env("DATABASE_URL")
 }
-enum ProductKind { FULL_BOTTLE DECANT }
-enum MovementType { PURCHASE SALE DECANT_PRODUCTION RETURN ADJUSTMENT }
-enum Role { OWNER ADMIN INVENTORY_STAFF SALES_STAFF }
+enum ProductKind {
+  FULL_BOTTLE
+  DECANT
+}
+enum MovementType {
+  PURCHASE
+  SALE
+  DECANT_PRODUCTION
+  RETURN
+  ADJUSTMENT
+}
+enum Role {
+  OWNER
+  ADMIN
+  INVENTORY_STAFF
+  SALES_STAFF
+}
 model User {
-  id String @id @default(cuid())
-  email String @unique
-  name String
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
   passwordHash String
-  role Role @default(SALES_STAFF)
-  active Boolean @default(true)
-  createdAt DateTime @default(now())
+  role         Role     @default(SALES_STAFF)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
 }
 model Fragrance {
-  id String @id @default(cuid())
-  brand String
-  name String
-  concentration String @default("")
-  skus ProductSku[]
+  id            String       @id @default(cuid())
+  brand         String
+  name          String
+  concentration String       @default("")
+  skus          ProductSku[]
   @@unique([brand, name, concentration])
 }
 model ProductSku {
-  id String @id @default(cuid())
-  fragranceId String
-  fragrance Fragrance @relation(fields:[fragranceId], references:[id])
-  sku String @unique
-  kind ProductKind
-  bottleVolumeMl Decimal? @db.Decimal(8,2)
-  decantSizeMl Decimal? @db.Decimal(8,2)
-  costPerUnit Decimal @db.Decimal(12,2)
-  sellingPrice Decimal @db.Decimal(12,2)
-  active Boolean @default(true)
-  balance InventoryBalance?
-  movements StockMovement[]
-  createdAt DateTime @default(now())
+  id             String      @id @default(cuid())
+  fragranceId    String
+  fragrance      Fragrance   @relation(fields: [fragranceId], references: [id])
+  sku            String      @unique
+  kind           ProductKind
+  bottleVolumeMl Decimal?    @db.Decimal(8, 2)
+  decantSizeMl   Decimal?    @db.Decimal(8, 2)
+  costPerUnit    Decimal     @db.Decimal(12, 2)
+  sellingPrice   Decimal     @db.Decimal(12, 2)
+  active         Boolean     @default(true)
+  balance        InventoryBalance?
+  movements      StockMovement[]
+  createdAt      DateTime    @default(now())
   @@index([kind, active])
 }
 model InventoryBalance {
-  id String @id @default(cuid())
-  productSkuId String @unique
-  productSku ProductSku @relation(fields:[productSkuId], references:[id])
-  quantity Decimal @default(0) @db.Decimal(12,2)
-  remainingVolumeMl Decimal @default(0) @db.Decimal(12,2)
-  updatedAt DateTime @updatedAt
+  id                String     @id @default(cuid())
+  productSkuId      String     @unique
+  productSku        ProductSku @relation(fields: [productSkuId], references: [id])
+  quantity          Decimal    @default(0) @db.Decimal(12, 2)
+  remainingVolumeMl Decimal    @default(0) @db.Decimal(12, 2)
+  updatedAt         DateTime   @updatedAt
 }
 model StockMovement {
-  id String @id @default(cuid())
-  productSkuId String
-  productSku ProductSku @relation(fields:[productSkuId], references:[id])
-  type MovementType
-  quantityDelta Decimal @db.Decimal(12,2)
-  unit String @default("unit")
-  sourceSkuId String?
-  sourceVolumeMl Decimal? @db.Decimal(8,2)
-  reason String?
-  createdAt DateTime @default(now())
+  id             String       @id @default(cuid())
+  productSkuId   String
+  productSku     ProductSku   @relation(fields: [productSkuId], references: [id])
+  type           MovementType
+  quantityDelta  Decimal      @db.Decimal(12, 2)
+  unit           String       @default("unit")
+  sourceSkuId    String?
+  sourceVolumeMl Decimal?     @db.Decimal(8, 2)
+  reason         String?
+  reference      String?
+  actorUserId    String?
+  createdAt      DateTime     @default(now())
   @@index([productSkuId, createdAt])
 }
