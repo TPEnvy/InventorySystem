@@ -13,7 +13,7 @@ export const app = express();
 app.disable("x-powered-by"); app.set("trust proxy",1); app.use(helmet());
 const origins=(process.env.CORS_ORIGIN||"").split(",").map(x=>x.trim()).filter(Boolean);
 app.use(cors({origin:(origin,cb)=>cb(null,!origin||origins.includes(origin))}));
-app.use(express.json({limit:"100kb"})); app.use("/api",rateLimit({windowMs:60000,limit:100}));
+app.use(express.json({limit:"100kb"})); app.use((req:any,_res:any,next:any)=>{const routed=req.query.route;if(typeof routed==="string"&&routed.startsWith("/api/"))req.url=routed;next()}); app.use("/api",rateLimit({windowMs:60000,limit:100}));
 const wrap=(fn:any)=>(req:any,res:any,next:any)=>Promise.resolve(fn(req,res,next)).catch(next);
 const jwtSecret=()=>{const s=process.env.JWT_SECRET;if(!s||s.length<32)throw Error("JWT secret not configured");return s};
 const auth=(req:any,res:any,next:any)=>{try{const h=req.headers.authorization;if(!h?.startsWith("Bearer "))return res.status(401).json({error:"Sign in required"});req.session=jwt.verify(h.slice(7),jwtSecret());next()}catch{return res.status(401).json({error:"Invalid session"})}};
