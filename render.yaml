@@ -4,7 +4,8 @@ services:
     runtime: node
     rootDir: apps/api
     buildCommand: npm install && npx prisma generate && npm run build
-    startCommand: npx prisma migrate deploy && npm start
+    preDeployCommand: npx prisma migrate deploy
+    startCommand: npm start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -12,6 +13,8 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
+        sync: false
+      - key: BOOTSTRAP_SECRET
         sync: false
       - key: CORS_ORIGIN
         sync: false
