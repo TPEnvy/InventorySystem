@@ -20,7 +20,7 @@ Use the repository Blueprint (`render.yaml`) to create two Render services: `pap
 
 Required API environment variables: `DATABASE_URL`, `JWT_SECRET` (32+ random characters), `BOOTSTRAP_SECRET` (temporary), and `CORS_ORIGIN` (exact frontend origin). The frontend requires `VITE_API_URL` set to the API origin and then a new frontend build. Never commit production secrets or place secrets in `VITE_*` variables.
 
-The Render API Blueprint runs `prisma migrate deploy` as a pre-deploy command. If running it manually, from the repository root use `npx prisma migrate deploy --schema apps/api/prisma/schema.prisma` with the production `DATABASE_URL` set. Do not use `migrate reset` or `db push` on production.
+The Render API Blueprint runs `prisma migrate deploy` as a pre-deploy command; Render requires a paid API service plan for pre-deploy commands, so review the plan and price before creating resources. If running migration manually (including from a trusted local terminal for a Free instance), use `npx prisma migrate deploy --schema apps/api/prisma/schema.prisma` from the repository root with the production `DATABASE_URL` set privately. Do not use `migrate reset` or `db push` on production.
 
 ## Deploy on Vercel
 
