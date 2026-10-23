@@ -14,7 +14,8 @@ This guide deploys the Papa Cologne PH inventory app from `TPEnvy/InventorySyste
 1. Push this repository to GitHub and make sure the desired branch contains `render.yaml`.
 2. In Render, choose **New → Blueprint**, connect GitHub, and select `TPEnvy/InventorySystem`.
 3. Review the Blueprint before applying it. It defines an API web service and a static frontend. Select a region close to the database if possible.
-4. Create the services. Render will ask for values marked `sync: false`; you can fill them during setup or in each service's **Environment** page.
+4. **Important plan note:** Render only runs `preDeployCommand` on paid web-service instances. The API Blueprint uses this safer pre-deploy migration step, so check the compute plan and pricing before applying it. Do not approve a paid plan unless you intend to pay for it. Render free web services can be used for a test deployment, but require a different migration approach and are not recommended as the production inventory system.
+5. Create the services. Render will ask for values marked `sync: false`; you can fill them during setup or in each service's **Environment** page.
 
 ## 3. Set the API service environment variables
 
@@ -46,7 +47,7 @@ The Blueprint runs `prisma migrate deploy` as the API service's pre-deploy comma
 1. Before the first deployment, take a database backup or confirm that the new database is empty.
 2. Deploy the API and inspect the Render deploy logs. Confirm the migration step succeeds before continuing.
 3. If the migration fails, stop here. Do not create the owner account or enter stock. Review the full error, database connectivity/TLS, permissions, and migration status. Do not blindly reset or drop a production database.
-4. To run the migration manually instead, use the Render Shell for the API service if available and run from the repository root:
+4. To run the migration manually instead (for example, when using a Free instance without Shell access), run it from a trusted local terminal or CI runner that can reach the production MySQL database. Set the production `DATABASE_URL` privately in that environment, then run from the repository root:
 
    `npx prisma migrate deploy --schema apps/api/prisma/schema.prisma`
 
